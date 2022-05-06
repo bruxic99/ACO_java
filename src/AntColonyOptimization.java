@@ -5,50 +5,45 @@ import java.util.stream.IntStream;
 
 class AntColonyOptimization {
 
-    private float alpha = 1;
-    private double beta = 5;
-    int maxIterations = 5;
     private int numberOfCities;
-    private float solutionscore;
-    double evaporation = 0.5;
-
-    int Q = 500;
+    private float solutionScore;
+    private final double evaporation;
+    private final int q;
+    private int vertex;
+    private int bestTourOrder;
+    private float bestTourLength;
     private Vector<Vector<Integer>> graph;
     private Vector<Integer> weights;
     private Vector<Double> trails;
-    private Vector<Integer> counter_edges;
-    private Vector<Integer> Neighborhood;
-    private List<Ant> ants = new ArrayList<>();
-    private Random random = new Random();
+    private Vector<Integer> counterEdges;
+    private final List<Ant> ants = new ArrayList<>();
+    private final Random random = new Random();
     private Vector<Double> probabilities;
-    private int vertex;
 
-    private int bestTourOrder;
-    private float bestTourLength;
     /**
      * Constructor
      */
-    AntColonyOptimization(double itertions, int number_of_ants) throws FileNotFoundException {
-        load();
-        IntStream.range(0, 5)
-                .forEach(i -> ants.add(new Ant()));
-        evaporation = itertions;
-        Q = number_of_ants;
+    AntColonyOptimization(double eParam, int qParam, String fileName) throws FileNotFoundException {
+        load(fileName);
+        for (int i = 0; i < 5; i++) ants.add(new Ant());
+        evaporation = eParam;
+        q = qParam;
     }
 
     /**
-     * Use this method to run the main logic
+     * Main method of ACO
      */
     void solve() {
 
         clearTrails();
 
+        int maxIterations = 5;
         for (int i = 0; i < maxIterations; i++) {
             moveAnts();
             updateTrails();
         }
 
-        System.out.println("Best tour length: " + (bestTourLength));
+        System.out.println("Best tour length: " + bestTourLength);
         System.out.println("Best tour order: " + bestTourOrder);
     }
 
@@ -56,84 +51,96 @@ class AntColonyOptimization {
      * At each iteration, move ants
      */
     private void moveAnts() {
-            for (Ant ant : ants) {
-                solutionscore =0;
-                ant.Solution = new Vector<>();
+            ants.forEach(ant -> {
+                solutionScore =0;
                 vertex = random.nextInt(numberOfCities);
-                Vector<Integer> used_vertexes = new Vector<>();
-                while(used_vertexes.size()<numberOfCities) {
+                Vector<Integer> usedVertexes = new Vector<>();
+                while(usedVertexes.size()<numberOfCities) {
                     int index = selectNextCity(ant);
                     ant.visitCity(index);
-                    counter_edges(index);
+                    countEdges(index);
                     count(index);
                     updateActual(index);
-                    if(!used_vertexes.contains(vertex))
-                        used_vertexes.add(vertex);
+                    if(!usedVertexes.contains(vertex))
+                        usedVertexes.add(vertex);
                 }
                 updateBest(ant);
-            }
-
-
+            });
     }
 
     /**
      * Add Neighborhood
      */
-    private void getNeighborhood(){
-        Neighborhood = new Vector<>();
+    private Vector<Integer> getNeighborhood(){
+        Vector<Integer> neighborhood = new Vector<>();
         IntStream.range(0, graph.size()).filter(i -> (
-                (graph.get(i).get(0) == vertex || graph.get(i).get(1) == vertex))).forEach(i -> Neighborhood.add(i));
+                (graph.get(i).get(0) == vertex || graph.get(i).get(1) == vertex))).forEach(neighborhood::add);
+        return neighborhood;
+    }
+    /**
+     * Check if all neighbor is used in neighborhood
+     */
+    private boolean checkAllUsed(Ant ant, Vector<Integer> neighborhood){
+        boolean allUsed = true;
+        for (Integer iterNeighborhood : neighborhood) {
+            if (!ant.getSolution().contains(iterNeighborhood)) {
+                allUsed = false;
+                break;
+            }
+        }
+        return allUsed;
+    }
+    /**
+     * Add all unused neighbor
+     */
+    private Vector<Integer> checkAllUnused(Ant ant, Vector<Integer> neighborhood){
+        Vector<Integer>notAllUsed = new Vector<>();
+        for (Integer neighborhoods : neighborhood) {
+            if (!ant.getSolution().contains(neighborhoods)) {
+                notAllUsed.add(neighborhoods);
+            }
+        }
+        return notAllUsed;
+    }
+    /**
+     * Find last time used edges in solution
+     */
+    private Vector<Integer> findLastTimeUsedEdge(Vector<Integer> neighborhood, Ant ant){
+        Vector<Integer> lastTimeUsedEdge = new Vector<>();
+        for (int j = 0; j < neighborhood.size(); j++) {
+            lastTimeUsedEdge.add(0);
+        }
+
+        for (int i = 0; i<ant.getSolution().size(); i++) {
+            for(int j = 0; j< neighborhood.size(); j++) {
+                if (neighborhood.get(j).equals(ant.getSolution().get(i))) {
+                    lastTimeUsedEdge.set(j, i);
+                }
+            }
+        }
+        return lastTimeUsedEdge;
     }
     /**
      * Select next city for each ant
      */
     private int selectNextCity(Ant ant) {
-        getNeighborhood();
-        boolean all_used = true;
-        for (Integer neighborhood : Neighborhood) {
-            if (!ant.Solution.contains(neighborhood)) {
-                all_used = false;
-            }
-        }
-        if(all_used) {
-            Vector<Integer> last_time_used_edge = new Vector<>();
-            int oldest_edge;
-            int index;
-            for (int j = 0; j < Neighborhood.size(); j++) {
-                last_time_used_edge.add(0);
-            }
+        Vector<Integer> neighborhood = getNeighborhood();
+        boolean allUsed = checkAllUsed(ant, neighborhood);
+        if(allUsed) {
 
-            for (int i = 0; i<ant.Solution.size(); i++) {
-                for(int j =0;j<Neighborhood.size();j++) {
-                    if (Neighborhood.get(j).equals(ant.Solution.get(i))) {
-                        last_time_used_edge.set(j, i);
-                    }
-                }
-            }
+            Vector<Integer> lastTimeUsedEdge = findLastTimeUsedEdge(neighborhood, ant);
 
-            oldest_edge = last_time_used_edge.get(0);
-            index = 0;
-            for (int j = 0; j < last_time_used_edge.size(); j++) {
-                if (oldest_edge > last_time_used_edge.get(j)) {
-                    oldest_edge = last_time_used_edge.get(j);
-                    index = j;
-                }
-            }
-            return Neighborhood.get(index);
+            int maxLastItem = Collections.min(lastTimeUsedEdge);
+            int index = lastTimeUsedEdge.indexOf(maxLastItem);
+            return neighborhood.get(index);
         }else {
-            Vector<Integer>not_all_used = new Vector<>();
-            for (Integer neighborhoods : Neighborhood) {
-                if (!ant.Solution.contains(neighborhoods)) {
-                    not_all_used.add(neighborhoods);
-                }
-            }
-            calculateProbabilities(not_all_used);
-            double r = random.nextDouble();
-            double total = 0;
-            for (int i=0;i<not_all_used.size();i++) {
+            Vector<Integer>notAllUsed = checkAllUnused(ant, neighborhood);
+            calculateProbabilities(notAllUsed);
+            double r = random.nextDouble(), total = 0;
+            for (int i=0; i<notAllUsed.size(); i++) {
                     total += probabilities.get(i);
                     if (total >= r) {
-                        return not_all_used.get(i);
+                        return notAllUsed.get(i);
                     }
             }
         }
@@ -141,15 +148,17 @@ class AntColonyOptimization {
     }
 
     /**
-     * Calculate the next city picks probabilites
+     * Calculate the next city picks probabilities
      */
-    private void calculateProbabilities(Vector<Integer> not_all_used) {
+    private void calculateProbabilities(Vector<Integer> notAllUsed) {
         double pheromone = 0.0;
+        float alpha = 1;
+        double beta = 5.0;
         probabilities = new Vector<>();
-        for (Integer next : not_all_used) {
+        for (Integer next : notAllUsed) {
                 pheromone += Math.pow(trails.get(next), alpha) * Math.pow(1.0 /weights.get(next), beta);
         }
-        for (Integer next : not_all_used) {
+        for (Integer next : notAllUsed) {
                 double numerator = Math.pow(trails.get(next), alpha) * Math.pow(1.0 / weights.get(next), beta);
                 probabilities.add(numerator / pheromone);
         }
@@ -159,44 +168,37 @@ class AntColonyOptimization {
      * Update trails that ants used
      */
     private void updateTrails() {
-        IntStream.range(0, graph.size()).forEach(i -> {
-            trails.set(i, trails.get(i) * evaporation);
-        });
+        IntStream.range(0, graph.size()).forEach(i -> trails.set(i, trails.get(i) * evaporation));
         for (Ant a : ants) {
-            double contribution = Q / a.trailLength(weights);
-            for (int i = 0; i < a.Solution.size(); i++) {
-                trails.set(a.Solution.get(i), +contribution) ;
+            double contribution = q / a.getTrailLength(weights);
+            for (int i = 0; i < a.getSolution().size(); i++) {
+                trails.set(a.getSolution().get(i), +contribution) ;
             }
         }
     }
     /**
      * Read graph and weights from file
      */
-    private void load() throws FileNotFoundException {
-
-        String file = "4.txt";
+    private void load(String fileName) throws FileNotFoundException {
         int number;
-        Scanner in = new Scanner(new File(file));
+        Scanner in = new Scanner(new File(fileName));
 
         graph = new Vector<>();
         weights = new Vector<>();
         while (in.hasNext()) {
             Vector<Integer> edge = new Vector<>();
             number = in.nextInt();
-            if(number>numberOfCities)
-                numberOfCities=number;
+            if(number > numberOfCities) numberOfCities = number;
             edge.add(number);
             number = in.nextInt();
-            if(number>numberOfCities)
-                numberOfCities=number;
+            if(number > numberOfCities) numberOfCities = number;
             edge.add(number);
             graph.add(edge);
             weights.add(in.nextInt());
-
         }
-        counter_edges = new Vector<>();
+        counterEdges = new Vector<>();
         for (int i = 0; i < graph.size(); i++) {
-            counter_edges.add(0);
+            counterEdges.add(0);
         }
     }
     /**
@@ -215,12 +217,12 @@ class AntColonyOptimization {
      */
     private void updateBest(Ant ant) {
         if (bestTourOrder == 0) {
-            bestTourOrder = ant.Solution.size();
-            bestTourLength = solutionscore;
+            bestTourOrder = ant.getSolution().size();
+            bestTourLength = solutionScore;
         }
-        if (solutionscore < bestTourLength) {
-            bestTourLength = solutionscore;
-            bestTourOrder = ant.Solution.size();
+        if (solutionScore < bestTourLength) {
+            bestTourLength = solutionScore;
+            bestTourOrder = ant.getSolution().size();
         }
 
     }
@@ -235,20 +237,20 @@ class AntColonyOptimization {
     /**
      * Count how many times ant passed through
      */
-    private void counter_edges(int vertex){
-        counter_edges.set(vertex,+1);
+    private void countEdges(int vertex){
+        counterEdges.set(vertex,+1);
     }
     /**
-     * Calculate Soultion score
+     * Calculate Solution score
      */
     private void count(int vertex){
-        solutionscore+=weight_of_edge(vertex);
+        solutionScore += getWeightedEdges(vertex);
     }
     /**
      * Calculate weight of edge
      */
-    private double weight_of_edge(int vertex){
-        return weights.get(vertex) * counter_edges.get(vertex);
+    private double getWeightedEdges(int vertex){
+        return weights.get(vertex) * counterEdges.get(vertex);
     }
 
 }

@@ -5,21 +5,20 @@ import java.util.stream.IntStream;
 public class Main {
 
     public static void main(String[] args) {
-        final double [] n = {0.1};
-        final int[] x = {500};
+        final double [] evaporation = {0.1};
+        final int[] q = {500};
         IntStream.rangeClosed(1, 10)
                 .forEach(i -> {
                     System.out.println("Attempt #" + i);
                     AntColonyOptimization aco = null;
                     try {
-                        System.out.println(x[0]);
-                        aco = new AntColonyOptimization(n[0],x[0] );
+                        aco = new AntColonyOptimization(evaporation[0],q[0], "1.txt" );
                     } catch (FileNotFoundException e) {
                         e.printStackTrace();
                     }
                     Objects.requireNonNull(aco).solve();
-                    n[0] +=0.09;
-                    x[0] -=50;
+                    evaporation[0] +=0.09;
+                    q[0] -=50;
                 });
         }
     }
